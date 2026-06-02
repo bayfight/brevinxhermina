@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function isSuperAdmin() {
+      return getUserRole() == 'super_admin';
+    }
+    
+    function hasFullPOAccess() {
+      return getUserRole() in ['super_admin', 'hermina_account'];
+    }
+    
+    function hasReadPOAccess() {
+      return getUserRole() in ['super_admin', 'hermina_account', 'staff_account', 
+                               'kopi_merchant_account', 'syrup_merchant_account'];
+    }
+    
+    function hasFullResiAccess() {
+      return getUserRole() in ['super_admin', 'staff_account', 
+                               'kopi_merchant_account', 'syrup_merchant_account'];
+    }
+    
+    function hasReadResiAccess() {
+      return getUserRole() in ['super_admin', 'hermina_account', 'staff_account',
+                               'kopi_merchant_account', 'syrup_merchant_account'];
+    }
+    
+    function hasFullInvoiceAccess() {
+      return isSuperAdmin();
+    }
+    
+    function hasReadInvoiceAccess() {
+      return getUserRole() in ['super_admin', 'hermina_account'];
+    }
+    
+    function hasFinanceAccess() {
+      return getUserRole() in ['super_admin', 'kopi_merchant_account', 'syrup_merchant_account'];
+    }
+    
+    function canAccessCategory(category) {
+      let role = getUserRole();
+      return role == 'super_admin' ||
+             role == 'hermina_account' ||
+             role == 'staff_account' ||
+             (role == 'kopi_merchant_account' && category in ['kopi', 'aren']) ||
+             (role == 'syrup_merchant_account' && category == 'syrup');
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow write: if isSuperAdmin();
+    }
+    
+    // Purchase Orders
+    match /purchase_orders/{poId} {
+      allow read: if isAuthenticated() && hasReadPOAccess() && canAccessCategory(resource.data.category);
+      allow create: if isAuthenticated() && hasFullPOAccess();
+      allow update, delete: if isAuthenticated() && hasFullPOAccess() && canAccessCategory(resource.data.category);
+    }
+    
+    // Resis
+    match /resis/{resiId} {
+      allow read: if isAuthenticated() && hasReadResiAccess() && canAccessCategory(resource.data.category);
+      allow create: if isAuthenticated() && hasFullResiAccess();
+      allow update, delete: if isAuthenticated() && hasFullResiAccess() && canAccessCategory(resource.data.category);
+    }
+    
+    // Invoices
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated() && hasReadInvoiceAccess() && canAccessCategory(resource.data.category);
+      allow create, update, delete: if isAuthenticated() && hasFullInvoiceAccess();
+    }
+    
+    // Finance Records
+    match /finance_records/{recordId} {
+      allow read: if isAuthenticated() && hasFinanceAccess() && canAccessCategory(resource.data.category);
+      allow write: if isSuperAdmin();
+    }
+  }
+}

@@ -1,0 +1,19 @@
+name: po-resi-invoice-dashboard
+description: Next.js Dashboard with Firebase Auth & Firestore for PO/Resi/Invoice management
+version: 1.0.0
+agent:
+  name: Antigravity
+  instructions: AGENTS.md
+rules:
+  - path: rules/safety.md
+    category: safety
+  - path: rules/development.md
+    category: development
+  - path: rules/firebase.md
+    category: firebase
+  - path: rules/rtk.md
+    category: rtk
+hooks:
+  directory: hooks/
+mcp:
+  directory: mcp/

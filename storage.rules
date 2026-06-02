@@ -1,0 +1,47 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function hasFullPOAccess() {
+      return getUserRole() in ['super_admin', 'hermina_account'];
+    }
+    
+    function hasFullResiAccess() {
+      return getUserRole() in ['super_admin', 'staff_account', 
+                               'kopi_merchant_account', 'syrup_merchant_account'];
+    }
+    
+    function hasFullInvoiceAccess() {
+      return getUserRole() == 'super_admin';
+    }
+    
+    // Purchase Order files
+    match /purchase-orders/{poId}/{filename} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasFullPOAccess();
+      allow delete: if isAuthenticated() && hasFullPOAccess();
+    }
+    
+    // Resi files
+    match /resis/{resiId}/{filename} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasFullResiAccess();
+      allow delete: if isAuthenticated() && hasFullResiAccess();
+    }
+    
+    // Invoice files
+    match /invoices/{invoiceId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasFullInvoiceAccess();
+      allow delete: if isAuthenticated() && hasFullInvoiceAccess();
+    }
+  }
+}
