@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Invoice, Category, Resi, PurchaseOrder } from '@/types/models';
+import { Invoice, Category, Resi, PurchaseOrder, MasterDataLocation } from '@/types/models';
 import { createInvoice, updateInvoice } from '@/app/actions/invoice';
 import { FileUpload } from '@/components/common/FileUpload';
 import { SearchableSelect } from '@/components/common/SearchableSelect';
