@@ -12,9 +12,25 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase once. Client components can be evaluated during SSR in
-// Next.js, so the default app must exist even when this module loads on server.
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Check if we are in build time and lack the API Key.
+// Using a dummy config during build-time prevents the Firebase SDK from throwing "auth/invalid-api-key"
+// when compiling static pages like the login page on hosting platforms like Vercel.
+const isBuildTime = 
+  typeof window === 'undefined' && 
+  (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PHASE === 'phase-production-build');
+
+const config = isBuildTime && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+  ? {
+      apiKey: "dummy-api-key-for-build-time-only",
+      authDomain: "dummy-project.firebaseapp.com",
+      projectId: "dummy-project",
+      storageBucket: "dummy-project.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    }
+  : firebaseConfig;
+
+const app = getApps().length === 0 ? initializeApp(config) : getApp();
 const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
 const storage: FirebaseStorage = getStorage(app);
