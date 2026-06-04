@@ -24,7 +24,7 @@ export default async function InvoicePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Invoice Management</h1>
           <p className="text-gray-600 mt-1">Manage invoices and billing documents</p>
@@ -32,7 +32,7 @@ export default async function InvoicePage() {
         {canManage && (
           <Link
             href="/invoice/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto text-center"
           >
             Create New Invoice
           </Link>

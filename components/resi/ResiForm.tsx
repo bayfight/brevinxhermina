@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Resi, Category, ResiStatus, PurchaseOrder } from '@/types/models';
 import { createResi, updateResi } from '@/app/actions/resi';
 import { FileUpload } from '@/components/common/FileUpload';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
 
 interface ResiFormProps {
   mode: 'create' | 'edit' | 'view';
@@ -113,43 +114,21 @@ export function ResiForm({ mode, initialData, availablePOs }: ResiFormProps) {
         <label htmlFor="poId" className="block text-sm font-medium text-gray-700 mb-2">
           Related PO <span className="text-red-500">*</span>
         </label>
-        <select
+        <SearchableSelect
           id="poId"
+          options={availablePOs.map((po) => ({
+            value: po.id,
+            label: `${po.poNumber} (${po.fileName})`,
+          }))}
           value={formData.poId}
-          onChange={(e) => setFormData({ ...formData, poId: e.target.value })}
+          onChange={(val) => setFormData({ ...formData, poId: val })}
+          placeholder="Select a PO"
           disabled={isReadOnly}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        >
-          <option value="">Select a PO</option>
-          {availablePOs.map((po) => (
-            <option key={po.id} value={po.id}>
-              {po.poNumber} - {po.category}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-          Category <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="category"
-          value={formData.category}
-          onChange={(e) => setFormData({ ...formData, category: e.target.value as Category })}
-          disabled={isReadOnly || !!formData.poId}
-          required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        >
-          <option value="kopi">Kopi</option>
-          <option value="aren">Aren</option>
-          <option value="syrup">Syrup</option>
-        </select>
-        {formData.poId && (
-          <p className="text-xs text-gray-500 mt-1">Category is auto-filled from selected PO</p>
-        )}
-      </div>
+
 
       <div>
         <label htmlFor="senderPhone" className="block text-sm font-medium text-gray-700 mb-2">
@@ -183,23 +162,7 @@ export function ResiForm({ mode, initialData, availablePOs }: ResiFormProps) {
         />
       </div>
 
-      <div>
-        <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-          Status <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="status"
-          value={formData.status}
-          onChange={(e) => setFormData({ ...formData, status: e.target.value as ResiStatus })}
-          disabled={isReadOnly}
-          required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        >
-          <option value="in_transit">In Transit</option>
-          <option value="delivered">Delivered</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
+
 
       {mode !== 'view' && (
         <FileUpload

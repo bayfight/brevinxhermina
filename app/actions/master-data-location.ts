@@ -15,18 +15,18 @@ import {
 const COLLECTION_NAME = 'master_data_locations';
 
 interface CreateMasterDataLocationInput {
-  locationCode: string;
-  province: string;
-  type: LocationType;
-  name: string;
+  branchName: string;
+  address: string;
+  picName: string;
+  picPhone: string;
   status: ItemStatus;
 }
 
 interface UpdateMasterDataLocationInput {
-  locationCode?: string;
-  province?: string;
-  type?: LocationType;
-  name?: string;
+  branchName?: string;
+  address?: string;
+  picName?: string;
+  picPhone?: string;
   status?: ItemStatus;
 }
 
@@ -40,10 +40,10 @@ function serializeTimestamp(timestamp: Timestamp) {
 function serializeLocation(id: string, data: FirebaseFirestore.DocumentData): MasterDataLocation {
   return {
     id,
-    locationCode: data.locationCode,
-    province: data.province,
-    type: data.type,
-    name: data.name,
+    branchName: data.branchName,
+    address: data.address,
+    picName: data.picName,
+    picPhone: data.picPhone,
     status: data.status,
     createdBy: data.createdBy,
     createdAt: serializeTimestamp(data.createdAt),
@@ -51,30 +51,30 @@ function serializeLocation(id: string, data: FirebaseFirestore.DocumentData): Ma
   };
 }
 
-function normalizeLocationCode(locationCode: string) {
-  return locationCode.trim().toUpperCase();
-}
-
 function validateInput(input: CreateMasterDataLocationInput | UpdateMasterDataLocationInput) {
-  if ('locationCode' in input && input.locationCode !== undefined && !input.locationCode.trim()) {
-    return 'Location code is required';
+  if ('branchName' in input && input.branchName !== undefined && !input.branchName.trim()) {
+    return 'Cabang Hermina is required';
   }
 
-  if ('province' in input && input.province !== undefined && !input.province.trim()) {
-    return 'Province is required';
+  if ('address' in input && input.address !== undefined && !input.address.trim()) {
+    return 'Alamat is required';
   }
 
-  if ('name' in input && input.name !== undefined && !input.name.trim()) {
-    return 'Kabupaten/Kota name is required';
+  if ('picName' in input && input.picName !== undefined && !input.picName.trim()) {
+    return 'Nama PIC is required';
+  }
+
+  if ('picPhone' in input && input.picPhone !== undefined && !input.picPhone.trim()) {
+    return 'No. HP is required';
   }
 
   return null;
 }
 
-async function locationCodeExists(locationCode: string, excludeId?: string) {
+async function branchNameExists(branchName: string, excludeId?: string) {
   const snapshot = await db
     .collection(COLLECTION_NAME)
-    .where('locationCode', '==', normalizeLocationCode(locationCode))
+    .where('branchName', '==', branchName.trim())
     .limit(1)
     .get();
 
@@ -113,8 +113,7 @@ export async function listMasterDataLocations(): Promise<Result<MasterDataLocati
 
     const snapshot = await db
       .collection(COLLECTION_NAME)
-      .orderBy('province', 'asc')
-      .orderBy('name', 'asc')
+      .orderBy('branchName', 'asc')
       .get();
 
     return {
@@ -220,22 +219,22 @@ export async function createMasterDataLocation(
       };
     }
 
-    if (await locationCodeExists(input.locationCode)) {
+    if (await branchNameExists(input.branchName)) {
       return {
         success: false,
         error: {
           code: 'DB_DUPLICATE',
-          message: 'A location with this code already exists',
+          message: 'A location with this branch name already exists',
         },
       };
     }
 
     const now = Timestamp.now();
     const docRef = await db.collection(COLLECTION_NAME).add({
-      locationCode: normalizeLocationCode(input.locationCode),
-      province: input.province.trim(),
-      type: input.type,
-      name: input.name.trim(),
+      branchName: input.branchName.trim(),
+      address: input.address.trim(),
+      picName: input.picName.trim(),
+      picPhone: input.picPhone.trim(),
       status: input.status,
       createdBy: user.uid,
       createdAt: now,
@@ -311,12 +310,12 @@ export async function updateMasterDataLocation(
       };
     }
 
-    if (input.locationCode && await locationCodeExists(input.locationCode, id)) {
+    if (input.branchName && await branchNameExists(input.branchName, id)) {
       return {
         success: false,
         error: {
           code: 'DB_DUPLICATE',
-          message: 'A location with this code already exists',
+          message: 'A location with this branch name already exists',
         },
       };
     }
@@ -325,10 +324,10 @@ export async function updateMasterDataLocation(
       updatedAt: Timestamp.now(),
     };
 
-    if (input.locationCode !== undefined) updateData.locationCode = normalizeLocationCode(input.locationCode);
-    if (input.province !== undefined) updateData.province = input.province.trim();
-    if (input.type !== undefined) updateData.type = input.type;
-    if (input.name !== undefined) updateData.name = input.name.trim();
+    if (input.branchName !== undefined) updateData.branchName = input.branchName.trim();
+    if (input.address !== undefined) updateData.address = input.address.trim();
+    if (input.picName !== undefined) updateData.picName = input.picName.trim();
+    if (input.picPhone !== undefined) updateData.picPhone = input.picPhone.trim();
     if (input.status !== undefined) updateData.status = input.status;
 
     await docRef.update(updateData);

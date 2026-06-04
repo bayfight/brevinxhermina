@@ -37,7 +37,6 @@ export function InvoiceList({ invoices, canManage }: InvoiceListProps) {
     const exportData = invoices.map((invoice) => ({
       invoiceNumber: invoice.invoiceNumber,
       resiNumber: invoice.resiNumber,
-      category: invoice.category,
       totalAmount: invoice.totalAmount
         ? new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -52,7 +51,6 @@ export function InvoiceList({ invoices, canManage }: InvoiceListProps) {
       [
         { header: 'Invoice Number', key: 'invoiceNumber', width: 20 },
         { header: 'Resi Number', key: 'resiNumber', width: 20 },
-        { header: 'Category', key: 'category', width: 15 },
         { header: 'Total Amount', key: 'totalAmount', width: 20 },
         { header: 'Created Date', key: 'createdAt', width: 15 },
       ],
@@ -70,16 +68,6 @@ export function InvoiceList({ invoices, canManage }: InvoiceListProps) {
       key: 'resiNumber',
       label: 'Resi Number',
       sortable: true,
-    },
-    {
-      key: 'category',
-      label: 'Category',
-      sortable: true,
-      render: (invoice) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-          {invoice.category}
-        </span>
-      ),
     },
     {
       key: 'totalAmount',
@@ -168,7 +156,7 @@ export function InvoiceList({ invoices, canManage }: InvoiceListProps) {
       <DataTable
         data={invoices}
         columns={columns}
-        searchPlaceholder="Search by invoice number, resi number, or category..."
+        searchPlaceholder="Search by invoice number or resi number..."
         emptyMessage="No invoices found"
       />
     </div>

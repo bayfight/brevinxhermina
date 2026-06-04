@@ -3,39 +3,32 @@
 import { FinanceRecord, Result, Category } from '@/types/models';
 import { getCurrentUser } from '@/lib/auth-server';
 import { hasFinanceAccess, getAllowedCategories } from '@/lib/authorization';
+import { db } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import { revalidatePath } from 'next/cache';
 
-// Mock data store (in-memory for MVP)
-let mockFinanceRecords: FinanceRecord[] = [
-  {
-    id: '1',
-    invoiceId: '1',
-    category: 'kopi',
-    paymentStatus: 'paid',
-    amount: 5000000,
-    paidAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-  {
-    id: '2',
-    invoiceId: '2',
-    category: 'syrup',
-    paymentStatus: 'unpaid',
-    amount: 3000000,
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-  {
-    id: '3',
-    invoiceId: '1',
-    category: 'aren',
-    paymentStatus: 'paid',
-    amount: 2500000,
-    paidAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-];
+const COLLECTION_NAME = 'finance_records';
+
+function serializeTimestamp(timestamp: any) {
+  if (!timestamp) return null;
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  } as any;
+}
+
+function serializeFinanceRecord(id: string, data: FirebaseFirestore.DocumentData): FinanceRecord {
+  return {
+    id,
+    invoiceId: data.invoiceId,
+    category: data.category,
+    paymentStatus: data.paymentStatus,
+    amount: data.amount,
+    paidAt: serializeTimestamp(data.paidAt),
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+}
 
 export async function listFinanceRecords(): Promise<Result<FinanceRecord[]>> {
   try {
@@ -65,14 +58,25 @@ export async function listFinanceRecords(): Promise<Result<FinanceRecord[]>> {
     // Get allowed categories for the user
     const allowedCategories = getAllowedCategories(user.role);
 
-    // Filter records by allowed categories
-    const filteredRecords = mockFinanceRecords.filter((record) =>
-      allowedCategories.includes(record.category)
-    );
+    if (!allowedCategories || allowedCategories.length === 0) {
+      return {
+        success: true,
+        data: [],
+      };
+    }
+
+    // Fetch records by allowed categories from Firestore
+    const snapshot = await db
+      .collection(COLLECTION_NAME)
+      .where('category', 'in', allowedCategories)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const records = snapshot.docs.map((doc) => serializeFinanceRecord(doc.id, doc.data()));
 
     return {
       success: true,
-      data: filteredRecords,
+      data: records,
     };
   } catch (error) {
     return {
@@ -110,9 +114,9 @@ export async function getFinanceRecordById(id: string): Promise<Result<FinanceRe
       };
     }
 
-    const record = mockFinanceRecords.find((r) => r.id === id);
+    const doc = await db.collection(COLLECTION_NAME).doc(id).get();
     
-    if (!record) {
+    if (!doc.exists) {
       return {
         success: false,
         error: {
@@ -121,6 +125,8 @@ export async function getFinanceRecordById(id: string): Promise<Result<FinanceRe
         },
       };
     }
+
+    const record = serializeFinanceRecord(doc.id, doc.data()!);
 
     // Check if user has access to this category
     const allowedCategories = getAllowedCategories(user.role);

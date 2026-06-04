@@ -44,6 +44,8 @@ The system uses seven main Firestore collections:
 **Fields**:
 - `id` (string) - Document ID (auto-generated)
 - `poNumber` (string) - Business purchase order number
+- `poDate` (string, optional) - The date written in the PO document
+- `herminaLocation` (string, optional) - Automated Hermina branch location parsed from PO
 - `fileUrl` (string) - Firebase Storage download URL
 - `fileName` (string) - Original file name
 - `fileSize` (number) - File size in bytes
@@ -79,12 +81,12 @@ The system uses seven main Firestore collections:
 - `id` (string) - Document ID (auto-generated)
 - `resiNumber` (string) - Tracking/receipt number
 - `poId` (string) - Reference to Purchase Order document ID
-- `category` (string) - Category enum: `kopi`, `aren`, `syrup`
+- `category` (string, deprecated) - Category enum: `kopi`, `aren`, `syrup`
 - `senderPhone` (string) - Sender phone number
 - `receiverPhone` (string) - Receiver phone number
 - `receiptUrl` (string) - Firebase Storage download URL for receipt proof
 - `receiptFileName` (string) - Original receipt file name
-- `status` (string) - Status enum: `in_transit`, `delivered`, `cancelled`
+- `status` (string, deprecated) - Status enum: `in_transit`, `delivered`, `cancelled`
 - `uploadedBy` (string) - User UID who created the Resi
 - `createdAt` (timestamp) - Document creation timestamp
 - `updatedAt` (timestamp) - Last update timestamp
@@ -117,8 +119,8 @@ The system uses seven main Firestore collections:
 - `invoiceNumber` (string) - Business invoice number
 - `resiId` (string) - Reference to Resi document ID
 - `poId` (string) - Reference to Purchase Order document ID (from Resi)
-- `category` (string) - Category enum: `kopi`, `aren`, `syrup`
-- `invoiceTemplateUrl` (string) - Firebase Storage download URL for invoice template
+- `category` (string, deprecated) - Category enum: `kopi`, `aren`, `syrup`
+- `invoiceTemplateUrl` (string, deprecated) - Firebase Storage download URL for invoice template (deprecated, not required)
 - `deliveryNoteUrl` (string) - Firebase Storage download URL for delivery note
 - `poAttachmentUrl` (string) - Copied from PO fileUrl
 - `receiptUrl` (string) - Firebase Storage download URL for receipt

@@ -3,38 +3,38 @@
 import { PurchaseOrder, Result, Category } from '@/types/models';
 import { getCurrentUser } from '@/lib/auth-server';
 import { hasFullPOAccess } from '@/lib/authorization';
+import { db } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import { revalidatePath } from 'next/cache';
 
-// Mock data store (in-memory for MVP)
-let mockPOs: PurchaseOrder[] = [
-  {
-    id: '1',
-    poNumber: 'PO-2024-001',
-    fileUrl: '#',
-    fileName: 'po-001.pdf',
-    fileSize: 1024000,
-    category: 'kopi',
-    uploadedBy: 'user1',
-    uploadedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    metadata: { supplier: 'Coffee Supplier A' },
-  },
-  {
-    id: '2',
-    poNumber: 'PO-2024-002',
-    fileUrl: '#',
-    fileName: 'po-002.pdf',
-    fileSize: 2048000,
-    category: 'syrup',
-    uploadedBy: 'user2',
-    uploadedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    metadata: { supplier: 'Syrup Supplier B' },
-  },
-];
+const COLLECTION_NAME = 'purchase_orders';
 
-let nextId = 3;
+function serializeTimestamp(timestamp: any) {
+  if (!timestamp) return null;
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  } as any;
+}
+
+function serializePO(id: string, data: FirebaseFirestore.DocumentData): PurchaseOrder {
+  return {
+    id,
+    poNumber: data.poNumber,
+    poDate: data.poDate,
+    fileUrl: data.fileUrl,
+    fileName: data.fileName,
+    fileSize: data.fileSize,
+    category: data.category,
+    uploadedBy: data.uploadedBy,
+    uploadedAt: serializeTimestamp(data.uploadedAt),
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+    herminaLocation: data.herminaLocation,
+    totalAmount: data.totalAmount,
+    metadata: data.metadata || {},
+  };
+}
 
 export async function listPOs(): Promise<Result<PurchaseOrder[]>> {
   try {
@@ -50,10 +50,16 @@ export async function listPOs(): Promise<Result<PurchaseOrder[]>> {
       };
     }
 
-    // Return all POs (category filtering can be added later)
+    const snapshot = await db
+      .collection(COLLECTION_NAME)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const pos = snapshot.docs.map((doc) => serializePO(doc.id, doc.data()));
+
     return {
       success: true,
-      data: mockPOs,
+      data: pos,
     };
   } catch (error) {
     return {
@@ -80,9 +86,9 @@ export async function getPOById(id: string): Promise<Result<PurchaseOrder>> {
       };
     }
 
-    const po = mockPOs.find((p) => p.id === id);
+    const doc = await db.collection(COLLECTION_NAME).doc(id).get();
     
-    if (!po) {
+    if (!doc.exists) {
       return {
         success: false,
         error: {
@@ -94,7 +100,7 @@ export async function getPOById(id: string): Promise<Result<PurchaseOrder>> {
 
     return {
       success: true,
-      data: po,
+      data: serializePO(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -109,10 +115,13 @@ export async function getPOById(id: string): Promise<Result<PurchaseOrder>> {
 
 interface CreatePOInput {
   poNumber: string;
+  poDate?: string;
   category: Category;
   fileUrl: string;
   fileName: string;
   fileSize: number;
+  herminaLocation?: string;
+  totalAmount?: number;
   metadata?: Record<string, any>;
 }
 
@@ -142,19 +151,24 @@ export async function createPO(input: CreatePOInput): Promise<Result<PurchaseOrd
     }
 
     // Validate required fields
-    if (!input.poNumber || !input.category || !input.fileUrl) {
+    if (!input.poNumber || !input.fileUrl) {
       return {
         success: false,
         error: {
           code: 'VALIDATION_REQUIRED_FIELD',
-          message: 'PO number, category, and file are required',
+          message: 'PO number and file are required',
         },
       };
     }
 
     // Check for duplicate PO number
-    const existingPO = mockPOs.find((p) => p.poNumber === input.poNumber);
-    if (existingPO) {
+    const duplicateCheck = await db
+      .collection(COLLECTION_NAME)
+      .where('poNumber', '==', input.poNumber)
+      .limit(1)
+      .get();
+
+    if (!duplicateCheck.empty) {
       return {
         success: false,
         error: {
@@ -164,27 +178,31 @@ export async function createPO(input: CreatePOInput): Promise<Result<PurchaseOrd
       };
     }
 
-    const now = { seconds: Date.now() / 1000, nanoseconds: 0 } as any;
+    const now = Timestamp.now();
     
-    const newPO: PurchaseOrder = {
-      id: String(nextId++),
+    const docRef = await db.collection(COLLECTION_NAME).add({
       poNumber: input.poNumber,
+      poDate: input.poDate || '',
       fileUrl: input.fileUrl,
       fileName: input.fileName,
       fileSize: input.fileSize,
-      category: input.category,
+      category: input.category || 'kopi',
       uploadedBy: user.uid,
       uploadedAt: now,
       createdAt: now,
       updatedAt: now,
+      herminaLocation: input.herminaLocation || '',
+      totalAmount: input.totalAmount || 0,
       metadata: input.metadata || {},
-    };
+    });
 
-    mockPOs.push(newPO);
+    revalidatePath('/po');
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: newPO,
+      data: serializePO(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -199,10 +217,13 @@ export async function createPO(input: CreatePOInput): Promise<Result<PurchaseOrd
 
 interface UpdatePOInput {
   poNumber?: string;
+  poDate?: string;
   category?: Category;
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;
+  herminaLocation?: string;
+  totalAmount?: number;
   metadata?: Record<string, any>;
 }
 
@@ -234,9 +255,10 @@ export async function updatePO(
       };
     }
 
-    const poIndex = mockPOs.findIndex((p) => p.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (poIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -247,9 +269,14 @@ export async function updatePO(
     }
 
     // Check for duplicate PO number if updating
-    if (input.poNumber && input.poNumber !== mockPOs[poIndex].poNumber) {
-      const existingPO = mockPOs.find((p) => p.poNumber === input.poNumber);
-      if (existingPO) {
+    if (input.poNumber && input.poNumber !== existing.data()!.poNumber) {
+      const duplicateCheck = await db
+        .collection(COLLECTION_NAME)
+        .where('poNumber', '==', input.poNumber)
+        .limit(1)
+        .get();
+
+      if (!duplicateCheck.empty) {
         return {
           success: false,
           error: {
@@ -260,22 +287,30 @@ export async function updatePO(
       }
     }
 
-    const updatedPO: PurchaseOrder = {
-      ...mockPOs[poIndex],
-      ...(input.poNumber && { poNumber: input.poNumber }),
-      ...(input.category && { category: input.category }),
-      ...(input.fileUrl && { fileUrl: input.fileUrl }),
-      ...(input.fileName && { fileName: input.fileName }),
-      ...(input.fileSize && { fileSize: input.fileSize }),
-      ...(input.metadata && { metadata: input.metadata }),
-      updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+    const updateData: Record<string, any> = {
+      updatedAt: Timestamp.now(),
     };
 
-    mockPOs[poIndex] = updatedPO;
+    if (input.poNumber !== undefined) updateData.poNumber = input.poNumber;
+    if (input.poDate !== undefined) updateData.poDate = input.poDate;
+    if (input.category !== undefined) updateData.category = input.category;
+    if (input.fileUrl !== undefined) updateData.fileUrl = input.fileUrl;
+    if (input.fileName !== undefined) updateData.fileName = input.fileName;
+    if (input.fileSize !== undefined) updateData.fileSize = input.fileSize;
+    if (input.herminaLocation !== undefined) updateData.herminaLocation = input.herminaLocation;
+    if (input.totalAmount !== undefined) updateData.totalAmount = input.totalAmount;
+    if (input.metadata !== undefined) updateData.metadata = input.metadata;
+
+    await docRef.update(updateData);
+
+    revalidatePath('/po');
+    revalidatePath(`/po/${id}`);
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: updatedPO,
+      data: serializePO(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -313,9 +348,10 @@ export async function deletePO(id: string): Promise<Result<void>> {
       };
     }
 
-    const poIndex = mockPOs.findIndex((p) => p.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (poIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -325,7 +361,9 @@ export async function deletePO(id: string): Promise<Result<void>> {
       };
     }
 
-    mockPOs.splice(poIndex, 1);
+    await docRef.delete();
+
+    revalidatePath('/po');
 
     return {
       success: true,

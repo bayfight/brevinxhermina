@@ -17,7 +17,7 @@ export default async function POPage() {
   if (!result.success) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h1 className="text-3xl font-bold text-gray-900">Purchase Orders</h1>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -31,12 +31,12 @@ export default async function POPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Purchase Orders</h1>
         {canManagePO && (
           <Link
             href="/po/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto text-center"
           >
             + Create PO
           </Link>

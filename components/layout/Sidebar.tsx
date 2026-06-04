@@ -23,7 +23,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    name: 'Dashboard',
+    name: 'History transaksi',
     href: '/dashboard',
     icon: '📊',
     allowedRoles: [
@@ -125,7 +125,7 @@ export function Sidebar({ userRole, onClose }: SidebarProps) {
       <div className="p-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">PO-Resi-Invoice</h1>
-          <p className="text-sm text-gray-500 mt-1">Dashboard</p>
+          <p className="text-sm text-gray-500 mt-1">History transaksi</p>
         </div>
         
         {/* Close button for mobile */}

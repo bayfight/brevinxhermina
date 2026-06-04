@@ -51,7 +51,7 @@ export default async function MasterDataLokasiDetailPage({
           {canManage ? 'Edit' : 'View'} Master Data Lokasi
         </h1>
         <p className="text-gray-600 mt-2">
-          Location Code: {result.data.locationCode}
+          Cabang Hermina: {result.data.branchName}
         </p>
       </div>
 

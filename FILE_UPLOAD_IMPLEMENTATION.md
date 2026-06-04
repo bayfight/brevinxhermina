@@ -58,9 +58,9 @@ Reusable file upload component with:
 
 ### 6. `app/actions/invoice.ts`
 **Changes:**
-- Updated `CreateInvoiceInput` interface to include invoiceTemplateUrl, deliveryNoteUrl, receiptUrl
+- Updated `CreateInvoiceInput` interface to include deliveryNoteUrl, receiptUrl (invoiceTemplateUrl is deprecated)
 - Updated `UpdateInvoiceInput` interface to include optional file fields
-- Updated `createInvoice()` to validate and save all 3 file URLs
+- Updated `createInvoice()` to validate and save 2 file URLs (Delivery Note & Receipt)
 - Updated `updateInvoice()` to handle file updates
 
 ## Files Modified Summary
@@ -73,8 +73,8 @@ Reusable file upload component with:
 | `app/actions/po.ts` | ✅ Updated | Handle PO file data |
 | `components/resi/ResiForm.tsx` | ✅ Updated | Added image/PDF upload |
 | `app/actions/resi.ts` | ✅ Updated | Handle Resi file data |
-| `components/invoice/InvoiceForm.tsx` | ✅ Updated | Added 3 PDF uploads |
-| `app/actions/invoice.ts` | ✅ Updated | Handle Invoice file data |
+| `components/invoice/InvoiceForm.tsx` | ✅ Updated | Added 2 PDF uploads (Delivery Note & Receipt) |
+| `app/actions/invoice.ts` | ✅ Updated | Handle Invoice file data (Delivery Note & Receipt) |
 
 ## File Type Restrictions
 
@@ -82,7 +82,7 @@ Reusable file upload component with:
 |--------|-------------------|----------|----------|-------|
 | **PO** | PDF only | 10MB | Yes (create mode) | 1 file |
 | **Resi** | JPG, PNG, PDF, HEIC, WEBP | 10MB | No | 1 file |
-| **Invoice** | PDF only | 10MB | Yes (create mode) | 3 files |
+| **Invoice** | PDF only | 10MB | Yes (create mode) | 2 files (Delivery Note & Receipt) |
 
 ## Firebase Storage Structure
 
@@ -97,7 +97,6 @@ Reusable file upload component with:
 
 /invoices/
   /{invoiceNumber}/
-    /template/{timestamp}_{filename}.pdf
     /delivery-note/{timestamp}_{filename}.pdf
     /receipt/{timestamp}_{filename}.pdf
 ```
@@ -147,23 +146,22 @@ Reusable file upload component with:
 - [ ] Try uploading invalid file type (should fail)
 
 ### Invoice Module
-- [x] Create Invoice with 3 PDF uploads (template, delivery note, receipt)
+- [x] Create Invoice with 2 PDF uploads (delivery note, receipt)
 - [x] Verify all files appear in Firebase Storage
 - [x] View uploaded invoice files
 - [x] Edit Invoice and upload new files
 - [x] Try uploading non-PDF file (should fail)
 - [x] Try uploading file > 10MB (should fail)
-- [x] Verify all 3 files are required for create mode
+- [x] Verify both files are required for create mode
 
 ## Next Steps
 
 ### 1. ~~Invoice File Upload~~ ✅ COMPLETE
-Invoice now supports **3 file uploads** (all PDF):
-- ✅ Invoice Template
+Invoice now supports **2 file uploads** (all PDF):
 - ✅ Delivery Note  
 - ✅ Receipt
-- ✅ All files required for create mode
-- ✅ Storage paths: `invoices/{invoiceNumber}/template/`, `/delivery-note/`, `/receipt/`
+- ✅ Both files required for create mode
+- ✅ Storage paths: `invoices/{invoiceNumber}/delivery-note/`, `/receipt/`
 
 ### 2. File Deletion
 When updating/deleting records, old files should be removed from Storage:
@@ -289,7 +287,7 @@ All file upload functionality has been successfully implemented:
 
 ✅ **Purchase Order**: 1 PDF file upload  
 ✅ **Resi**: 1 image/PDF file upload  
-✅ **Invoice**: 3 PDF file uploads (template, delivery note, receipt)
+✅ **Invoice**: 2 PDF file uploads (delivery note, receipt)
 
 Total files created: 2  
 Total files modified: 6  

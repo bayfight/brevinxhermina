@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth-server';
 import { hasFullPOAccess } from '@/lib/authorization';
 import { getPOById } from '@/app/actions/po';
+import { listMasterDataLocations } from '@/app/actions/master-data-location';
 import { POForm } from '@/components/po/POForm';
 
 interface PODetailPageProps {
@@ -18,22 +19,27 @@ export default async function PODetailPage({ params }: PODetailPageProps) {
   }
 
   const { id } = await params;
-  const result = await getPOById(id);
+  
+  const [poResult, locationsResult] = await Promise.all([
+    getPOById(id),
+    listMasterDataLocations(),
+  ]);
 
-  if (!result.success) {
+  if (!poResult.success) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Purchase Order Not Found</h1>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{result.error.message}</p>
+          <p className="text-red-800">{poResult.error.message}</p>
         </div>
       </div>
     );
   }
 
   const canManage = hasFullPOAccess(user.role);
+  const availableLocations = locationsResult.success ? locationsResult.data : [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -41,10 +47,14 @@ export default async function PODetailPage({ params }: PODetailPageProps) {
         <h1 className="text-3xl font-bold text-gray-900">
           {canManage ? 'Edit' : 'View'} Purchase Order
         </h1>
-        <p className="text-gray-600 mt-2">PO Number: {result.data.poNumber}</p>
+        <p className="text-gray-600 mt-2">PO Number: {poResult.data.poNumber}</p>
       </div>
 
-      <POForm mode={canManage ? 'edit' : 'view'} initialData={result.data} />
+      <POForm 
+        mode={canManage ? 'edit' : 'view'} 
+        initialData={poResult.data} 
+        availableLocations={availableLocations} 
+      />
     </div>
   );
 }

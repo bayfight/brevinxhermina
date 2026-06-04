@@ -35,7 +35,7 @@ service cloud.firestore {
     }
     
     function hasFullInvoiceAccess() {
-      return isSuperAdmin();
+      return getUserRole() in ['super_admin', 'hermina_account'];
     }
     
     function hasReadInvoiceAccess() {

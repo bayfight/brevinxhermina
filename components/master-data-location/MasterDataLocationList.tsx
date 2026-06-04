@@ -17,8 +17,8 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const handleDelete = async (id: string, locationCode: string) => {
-    if (!confirm(`Are you sure you want to delete location ${locationCode}?`)) {
+  const handleDelete = async (id: string, branchName: string) => {
+    if (!confirm(`Are you sure you want to delete location ${branchName}?`)) {
       return;
     }
 
@@ -35,10 +35,10 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
 
   const handleExportExcel = () => {
     const exportData = locations.map((location) => ({
-      locationCode: location.locationCode,
-      province: location.province,
-      type: location.type,
-      name: location.name,
+      branchName: location.branchName,
+      address: location.address,
+      picName: location.picName,
+      picPhone: location.picPhone,
       status: location.status,
       createdAt: new Date(location.createdAt.seconds * 1000).toLocaleDateString(),
     }));
@@ -46,10 +46,10 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
     exportToExcel(
       exportData,
       [
-        { header: 'Location Code', key: 'locationCode', width: 18 },
-        { header: 'Province', key: 'province', width: 24 },
-        { header: 'Type', key: 'type', width: 14 },
-        { header: 'Kabupaten/Kota', key: 'name', width: 28 },
+        { header: 'Cabang Hermina', key: 'branchName', width: 28 },
+        { header: 'Alamat', key: 'address', width: 45 },
+        { header: 'Nama PIC', key: 'picName', width: 24 },
+        { header: 'No. HP', key: 'picPhone', width: 18 },
         { header: 'Status', key: 'status', width: 14 },
         { header: 'Created Date', key: 'createdAt', width: 16 },
       ],
@@ -59,28 +59,23 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
 
   const columns: Column<MasterDataLocation>[] = [
     {
-      key: 'locationCode',
-      label: 'Code',
+      key: 'branchName',
+      label: 'Cabang Hermina',
       sortable: true,
     },
     {
-      key: 'province',
-      label: 'Province',
+      key: 'address',
+      label: 'Alamat',
       sortable: true,
     },
     {
-      key: 'type',
-      label: 'Type',
+      key: 'picName',
+      label: 'Nama PIC',
       sortable: true,
-      render: (location) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-          {location.type}
-        </span>
-      ),
     },
     {
-      key: 'name',
-      label: 'Kabupaten/Kota',
+      key: 'picPhone',
+      label: 'No. HP',
       sortable: true,
     },
     {
@@ -89,11 +84,10 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
       sortable: true,
       render: (location) => (
         <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-            location.status === 'active'
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${location.status === 'active'
               ? 'bg-green-100 text-green-800'
               : 'bg-gray-100 text-gray-800'
-          }`}
+            }`}
         >
           {location.status}
         </span>
@@ -105,12 +99,7 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
       sortable: false,
       render: (location) => (
         <div className="flex items-center gap-2">
-          <Link
-            href={`/master-data-lokasi/${location.id}`}
-            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-          >
-            View
-          </Link>
+
           {canManage && (
             <>
               <Link
@@ -120,7 +109,7 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
                 Edit
               </Link>
               <button
-                onClick={() => handleDelete(location.id, location.locationCode)}
+                onClick={() => handleDelete(location.id, location.branchName)}
                 disabled={isDeleting === location.id}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -147,7 +136,7 @@ export function MasterDataLocationList({ locations, canManage }: MasterDataLocat
       <DataTable
         data={locations}
         columns={columns}
-        searchPlaceholder="Search by code, province, type, city, or regency..."
+        searchPlaceholder="Search by branch name, address, PIC, or phone..."
         emptyMessage="No master data locations found"
       />
     </div>

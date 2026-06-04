@@ -1,29 +1,128 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PurchaseOrder, Category } from '@/types/models';
+import { PurchaseOrder, Category, MasterDataLocation } from '@/types/models';
 import { createPO, updatePO } from '@/app/actions/po';
 import { FileUpload } from '@/components/common/FileUpload';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
 
 interface POFormProps {
   mode: 'create' | 'edit' | 'view';
   initialData?: PurchaseOrder;
+  availableLocations?: MasterDataLocation[];
 }
 
-export function POForm({ mode, initialData }: POFormProps) {
+export function POForm({ mode, initialData, availableLocations = [] }: POFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRSWarning, setShowRSWarning] = useState(false);
 
   const [formData, setFormData] = useState({
     poNumber: initialData?.poNumber || '',
+    poDate: initialData?.poDate || '',
     category: initialData?.category || ('kopi' as Category),
-    supplier: initialData?.metadata?.supplier || '',
     fileUrl: initialData?.fileUrl || '',
     fileName: initialData?.fileName || '',
     fileSize: initialData?.fileSize || 0,
+    herminaLocation: initialData?.herminaLocation || '',
+    totalAmount: initialData?.totalAmount?.toString() || '',
   });
+
+  // No longer loading locations since we auto-detect branch names directly
+
+  const handleValidateFile = async (file: File): Promise<{ success: boolean; errorMessage?: string }> => {
+    const fileNameLower = file.name.toLowerCase();
+    const blacklist = ["kopi", "aren", "syrup", "sirup", "po", "pdf", "invoice", "resi", "dashboard", "file", "upload", "test", "record"];
+
+    const extractBranchName = (text: string): string | null => {
+      // Mencari kata "hermina" diikuti oleh kata berikutnya
+      const match = text.match(/hermina\s+([a-zA-Z0-9\s]+)/i);
+      if (match) {
+        const candidateWords = match[1].trim().split(/[\s_\-]+/);
+        const filteredWords = candidateWords.filter(
+          word => word && !blacklist.includes(word.toLowerCase())
+        );
+        // Ambil maksimal 2 kata pertama yang bukan blacklist
+        const branchWords = filteredWords.slice(0, 2);
+        if (branchWords.length > 0) {
+          return branchWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+        }
+      }
+      return null;
+    };
+
+    // 1. Coba deteksi dari nama file
+    const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+    const cleanName = nameWithoutExt.replace(/[_\-\s]+/g, " ");
+    let detectedRS = extractBranchName(cleanName);
+
+    // 2. Fallback: baca biner/teks isi file
+    if (!detectedRS) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const textContent = new TextDecoder('utf-8', { fatal: false }).decode(arrayBuffer);
+        detectedRS = extractBranchName(textContent);
+      } catch (err) {
+        console.error('Error reading PDF content:', err);
+      }
+    }
+
+    // Auto-detect category from filename if present (fallback to "kopi")
+    let detectedCategory = formData.category;
+    if (fileNameLower.includes('aren')) {
+      detectedCategory = 'aren';
+    } else if (fileNameLower.includes('syrup') || fileNameLower.includes('sirup')) {
+      detectedCategory = 'syrup';
+    } else if (fileNameLower.includes('kopi')) {
+      detectedCategory = 'kopi';
+    }
+
+    let matchedLocation: MasterDataLocation | undefined;
+    if (detectedRS) {
+      const searchKey = detectedRS.toLowerCase();
+      matchedLocation = availableLocations.find(
+        (loc) => loc.branchName.toLowerCase().includes(searchKey)
+      );
+    }
+
+    if (matchedLocation) {
+      setShowRSWarning(false);
+      setFormData(prev => ({
+        ...prev,
+        herminaLocation: matchedLocation!.branchName,
+        category: detectedCategory,
+      }));
+    } else if (detectedRS) {
+      const fallbackName = `RS Hermina ${detectedRS}`;
+      const exactFallback = availableLocations.find(
+        (loc) => loc.branchName.toLowerCase() === fallbackName.toLowerCase()
+      );
+      if (exactFallback) {
+        setShowRSWarning(false);
+        setFormData(prev => ({
+          ...prev,
+          herminaLocation: exactFallback.branchName,
+          category: detectedCategory,
+        }));
+      } else {
+        setShowRSWarning(true);
+        setFormData(prev => ({
+          ...prev,
+          category: detectedCategory,
+        }));
+      }
+    } else {
+      setShowRSWarning(true);
+      setFormData(prev => ({
+        ...prev,
+        category: detectedCategory,
+      }));
+    }
+
+    return { success: true };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,18 +134,24 @@ export function POForm({ mode, initialData }: POFormProps) {
       return;
     }
 
+    // Validate herminaLocation is present
+    if (!formData.herminaLocation) {
+      setError('Nama RS Hermina wajib diisi.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const input = {
         poNumber: formData.poNumber,
+        poDate: formData.poDate,
         category: formData.category,
         fileUrl: formData.fileUrl,
         fileName: formData.fileName,
         fileSize: formData.fileSize,
-        metadata: {
-          supplier: formData.supplier,
-        },
+        herminaLocation: formData.herminaLocation,
+        totalAmount: formData.totalAmount ? parseFloat(formData.totalAmount) : undefined,
       };
 
       let result;
@@ -70,12 +175,12 @@ export function POForm({ mode, initialData }: POFormProps) {
   };
 
   const handleFileUpload = (downloadURL: string, fileName: string, fileSize: number) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       fileUrl: downloadURL,
       fileName: fileName,
       fileSize: fileSize,
-    });
+    }));
   };
 
   const isReadOnly = mode === 'view';
@@ -105,35 +210,57 @@ export function POForm({ mode, initialData }: POFormProps) {
       </div>
 
       <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-          Category <span className="text-red-500">*</span>
+        <label htmlFor="poDate" className="block text-sm font-medium text-gray-700 mb-2">
+          PO Date <span className="text-red-500">*</span>
         </label>
-        <select
-          id="category"
-          value={formData.category}
-          onChange={(e) => setFormData({ ...formData, category: e.target.value as Category })}
+        <input
+          type="date"
+          id="poDate"
+          value={formData.poDate}
+          onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
           disabled={isReadOnly}
           required
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        >
-          <option value="kopi">Kopi</option>
-          <option value="aren">Aren</option>
-          <option value="syrup">Syrup</option>
-        </select>
+        />
       </div>
 
       <div>
-        <label htmlFor="supplier" className="block text-sm font-medium text-gray-700 mb-2">
-          Supplier
+        <label htmlFor="herminaLocation" className="block text-sm font-medium text-gray-700 mb-2">
+          RS Hermina <span className="text-red-500">*</span>
+        </label>
+        <SearchableSelect
+          id="herminaLocation"
+          options={availableLocations.map((loc) => ({
+            value: loc.branchName,
+            label: loc.branchName,
+          }))}
+          value={formData.herminaLocation}
+          onChange={(val) => setFormData({ ...formData, herminaLocation: val })}
+          placeholder="Select RS Hermina Branch"
+          disabled={isReadOnly}
+          required
+        />
+        {showRSWarning && !formData.herminaLocation && (
+          <p className="text-amber-600 text-xs mt-1">
+            ⚠️ Nama RS Hermina tidak terdeteksi otomatis dari file PO. Silakan pilih secara manual.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="totalAmount" className="block text-sm font-medium text-gray-700 mb-2">
+          Nominal PO (IDR)
         </label>
         <input
-          type="text"
-          id="supplier"
-          value={formData.supplier}
-          onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+          type="number"
+          id="totalAmount"
+          value={formData.totalAmount}
+          onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
           disabled={isReadOnly}
+          min="0"
+          step="1000"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          placeholder="e.g., Coffee Supplier A"
+          placeholder="e.g., 5000000"
         />
       </div>
 
@@ -146,6 +273,7 @@ export function POForm({ mode, initialData }: POFormProps) {
           storagePath={`purchase-orders/${formData.poNumber || 'temp'}`}
           onUploadComplete={handleFileUpload}
           onUploadError={(error) => setError(error)}
+          onValidateFile={handleValidateFile}
           disabled={isReadOnly}
           required={mode === 'create'}
           currentFileURL={formData.fileUrl}

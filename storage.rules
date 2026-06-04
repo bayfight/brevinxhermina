@@ -20,7 +20,7 @@ service firebase.storage {
     }
     
     function hasFullInvoiceAccess() {
-      return getUserRole() == 'super_admin';
+      return getUserRole() in ['super_admin', 'hermina_account'];
     }
     
     // Purchase Order files

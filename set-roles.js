@@ -11,7 +11,7 @@ admin.initializeApp({
 // Daftar email user dan role-nya
 // GANTI EMAIL INI dengan email yang sudah Anda buat di Firebase Console
 const users = [
-  { email: 'bayu@mailinator.com', role: 'super_admin' },           // Ganti dengan email Super Admin Anda
+  { email: 'bogorpunyakopi@gmail.com', role: 'super_admin' },           // Ganti dengan email Super Admin Anda
   { email: 'hermina@mailinator.com', role: 'hermina_account' },     // Ganti dengan email Hermina Anda
   { email: 'bpk@mailinator.com', role: 'staff_account' },         // Ganti dengan email Staff Anda
   { email: 'uharu@mailinator.com', role: 'kopi_merchant_account' },  // Ganti dengan email Kopi Merchant Anda
@@ -30,11 +30,11 @@ async function setUserRole(email, role) {
 
 async function main() {
   console.log('🚀 Setting user roles di Firebase...\n');
-  
+
   for (const user of users) {
     await setUserRole(user.email, user.role);
   }
-  
+
   console.log('\n✅ Selesai!');
   console.log('\n📝 Catatan:');
   console.log('   - User harus logout dan login ulang agar role berubah');

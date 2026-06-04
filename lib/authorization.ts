@@ -59,7 +59,7 @@ export function hasReadResiAccess(role: UserRole | null): boolean {
  */
 export function hasFullInvoiceAccess(role: UserRole | null): boolean {
   if (!role) return false;
-  return role === 'super_admin';
+  return ['super_admin', 'hermina_account'].includes(role);
 }
 
 /**

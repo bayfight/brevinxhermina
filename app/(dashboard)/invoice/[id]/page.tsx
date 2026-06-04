@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth-server';
 import { hasInvoiceAccess, hasFullInvoiceAccess } from '@/lib/authorization';
 import { getInvoiceById } from '@/app/actions/invoice';
 import { listResis } from '@/app/actions/resi';
+import { listPOs } from '@/app/actions/po';
+import { listMasterDataLocations } from '@/app/actions/master-data-location';
 import { InvoiceForm } from '@/components/invoice/InvoiceForm';
 
 export default async function InvoiceDetailPage({
@@ -34,9 +36,16 @@ export default async function InvoiceDetailPage({
 
   const invoice = result.data;
 
-  // Fetch available Resis for dropdown
-  const resisResult = await listResis();
+  // Fetch available Resis, POs, and Locations for lookup
+  const [resisResult, posResult, locationsResult] = await Promise.all([
+    listResis(),
+    listPOs(),
+    listMasterDataLocations(),
+  ]);
+
   const availableResis = resisResult.success ? resisResult.data : [];
+  const availablePOs = posResult.success ? posResult.data : [];
+  const availableLocations = locationsResult.success ? locationsResult.data : [];
 
   return (
     <div className="space-y-6">
@@ -53,6 +62,8 @@ export default async function InvoiceDetailPage({
         mode={canManage ? 'edit' : 'view'}
         initialData={invoice}
         availableResis={availableResis}
+        availablePOs={availablePOs}
+        availableLocations={availableLocations}
       />
     </div>
   );

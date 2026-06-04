@@ -11,6 +11,7 @@ interface FileUploadProps {
   storagePath: string;
   onUploadComplete: (downloadURL: string, fileName: string, fileSize: number) => void;
   onUploadError?: (error: string) => void;
+  onValidateFile?: (file: File) => Promise<{ success: boolean; errorMessage?: string }>;
   disabled?: boolean;
   required?: boolean;
   currentFileURL?: string;
@@ -25,6 +26,7 @@ export function FileUpload({
   storagePath,
   onUploadComplete,
   onUploadError,
+  onValidateFile,
   disabled = false,
   required = false,
   currentFileURL,
@@ -35,7 +37,7 @@ export function FileUpload({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -55,6 +57,19 @@ export function FileUpload({
       setError(errorMsg);
       onUploadError?.(errorMsg);
       return;
+    }
+
+    if (onValidateFile) {
+      const validation = await onValidateFile(file);
+      if (!validation.success) {
+        const errorMsg = validation.errorMessage || 'File validation failed';
+        setError(errorMsg);
+        onUploadError?.(errorMsg);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
     }
 
     setSelectedFile(file);

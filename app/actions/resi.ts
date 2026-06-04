@@ -2,41 +2,37 @@
 
 import { Resi, Result, Category, ResiStatus } from '@/types/models';
 import { getCurrentUser } from '@/lib/auth-server';
-import { hasFullResiAccess, canAccessCategory } from '@/lib/authorization';
+import { hasFullResiAccess } from '@/lib/authorization';
+import { db } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import { revalidatePath } from 'next/cache';
 
-// Mock data store (in-memory for MVP)
-let mockResis: Resi[] = [
-  {
-    id: '1',
-    resiNumber: 'RESI-2024-001',
-    poId: '1',
-    category: 'kopi',
-    senderPhone: '+6281234567890',
-    receiverPhone: '+6289876543210',
-    receiptUrl: '#',
-    receiptFileName: 'receipt-001.pdf',
-    status: 'in_transit',
-    uploadedBy: 'user1',
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-  {
-    id: '2',
-    resiNumber: 'RESI-2024-002',
-    poId: '2',
-    category: 'syrup',
-    senderPhone: '+6281111111111',
-    receiverPhone: '+6282222222222',
-    receiptUrl: '#',
-    receiptFileName: 'receipt-002.pdf',
-    status: 'delivered',
-    uploadedBy: 'user2',
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-];
+const COLLECTION_NAME = 'resis';
 
-let nextId = 3;
+function serializeTimestamp(timestamp: any) {
+  if (!timestamp) return null;
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  } as any;
+}
+
+function serializeResi(id: string, data: FirebaseFirestore.DocumentData): Resi {
+  return {
+    id,
+    resiNumber: data.resiNumber,
+    poId: data.poId,
+    category: data.category,
+    senderPhone: data.senderPhone,
+    receiverPhone: data.receiverPhone,
+    receiptUrl: data.receiptUrl,
+    receiptFileName: data.receiptFileName,
+    status: data.status,
+    uploadedBy: data.uploadedBy,
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+}
 
 interface ResiFilters {
   category?: Category;
@@ -56,16 +52,19 @@ export async function listResis(filters?: ResiFilters): Promise<Result<Resi[]>> 
       };
     }
 
-    let filteredResis = mockResis;
+    let queryRef: FirebaseFirestore.Query = db.collection(COLLECTION_NAME);
 
-    // Apply category filter if provided
+    // Apply category filter if provided and not empty
     if (filters?.category) {
-      filteredResis = filteredResis.filter((r) => r.category === filters.category);
+      queryRef = queryRef.where('category', '==', filters.category);
     }
+
+    const snapshot = await queryRef.orderBy('createdAt', 'desc').get();
+    const resis = snapshot.docs.map((doc) => serializeResi(doc.id, doc.data()));
 
     return {
       success: true,
-      data: filteredResis,
+      data: resis,
     };
   } catch (error) {
     return {
@@ -92,9 +91,9 @@ export async function getResiById(id: string): Promise<Result<Resi>> {
       };
     }
 
-    const resi = mockResis.find((r) => r.id === id);
+    const doc = await db.collection(COLLECTION_NAME).doc(id).get();
     
-    if (!resi) {
+    if (!doc.exists) {
       return {
         success: false,
         error: {
@@ -106,7 +105,7 @@ export async function getResiById(id: string): Promise<Result<Resi>> {
 
     return {
       success: true,
-      data: resi,
+      data: serializeResi(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -122,7 +121,7 @@ export async function getResiById(id: string): Promise<Result<Resi>> {
 interface CreateResiInput {
   resiNumber: string;
   poId: string;
-  category: Category;
+  category?: Category;
   senderPhone: string;
   receiverPhone: string;
   status?: ResiStatus;
@@ -155,31 +154,25 @@ export async function createResi(input: CreateResiInput): Promise<Result<Resi>> 
       };
     }
 
-    // Check category access
-    if (!canAccessCategory(user.role, input.category)) {
-      return {
-        success: false,
-        error: {
-          code: 'AUTHZ_CATEGORY_RESTRICTED',
-          message: 'You do not have access to this category',
-        },
-      };
-    }
-
     // Validate required fields
-    if (!input.resiNumber || !input.poId || !input.category || !input.senderPhone || !input.receiverPhone) {
+    if (!input.resiNumber || !input.poId || !input.senderPhone || !input.receiverPhone) {
       return {
         success: false,
         error: {
           code: 'VALIDATION_REQUIRED_FIELD',
-          message: 'All fields are required',
+          message: 'Resi number, PO, sender phone, and receiver phone are required',
         },
       };
     }
 
     // Check for duplicate resi number
-    const existingResi = mockResis.find((r) => r.resiNumber === input.resiNumber);
-    if (existingResi) {
+    const duplicateCheck = await db
+      .collection(COLLECTION_NAME)
+      .where('resiNumber', '==', input.resiNumber)
+      .limit(1)
+      .get();
+
+    if (!duplicateCheck.empty) {
       return {
         success: false,
         error: {
@@ -189,13 +182,12 @@ export async function createResi(input: CreateResiInput): Promise<Result<Resi>> 
       };
     }
 
-    const now = { seconds: Date.now() / 1000, nanoseconds: 0 } as any;
+    const now = Timestamp.now();
     
-    const newResi: Resi = {
-      id: String(nextId++),
+    const docRef = await db.collection(COLLECTION_NAME).add({
       resiNumber: input.resiNumber,
       poId: input.poId,
-      category: input.category,
+      category: input.category || 'kopi',
       senderPhone: input.senderPhone,
       receiverPhone: input.receiverPhone,
       receiptUrl: input.receiptUrl || '',
@@ -204,13 +196,15 @@ export async function createResi(input: CreateResiInput): Promise<Result<Resi>> 
       uploadedBy: user.uid,
       createdAt: now,
       updatedAt: now,
-    };
+    });
 
-    mockResis.push(newResi);
+    revalidatePath('/resi');
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: newResi,
+      data: serializeResi(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -262,9 +256,10 @@ export async function updateResi(
       };
     }
 
-    const resiIndex = mockResis.findIndex((r) => r.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (resiIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -274,34 +269,15 @@ export async function updateResi(
       };
     }
 
-    const existingResi = mockResis[resiIndex];
-
-    // Check category access for existing resi
-    if (!canAccessCategory(user.role, existingResi.category)) {
-      return {
-        success: false,
-        error: {
-          code: 'AUTHZ_CATEGORY_RESTRICTED',
-          message: 'You do not have access to this category',
-        },
-      };
-    }
-
-    // Check category access for new category if updating
-    if (input.category && !canAccessCategory(user.role, input.category)) {
-      return {
-        success: false,
-        error: {
-          code: 'AUTHZ_CATEGORY_RESTRICTED',
-          message: 'You do not have access to the new category',
-        },
-      };
-    }
-
     // Check for duplicate resi number if updating
-    if (input.resiNumber && input.resiNumber !== existingResi.resiNumber) {
-      const duplicateResi = mockResis.find((r) => r.resiNumber === input.resiNumber);
-      if (duplicateResi) {
+    if (input.resiNumber && input.resiNumber !== existing.data()!.resiNumber) {
+      const duplicateCheck = await db
+        .collection(COLLECTION_NAME)
+        .where('resiNumber', '==', input.resiNumber)
+        .limit(1)
+        .get();
+
+      if (!duplicateCheck.empty) {
         return {
           success: false,
           error: {
@@ -312,24 +288,29 @@ export async function updateResi(
       }
     }
 
-    const updatedResi: Resi = {
-      ...existingResi,
-      ...(input.resiNumber && { resiNumber: input.resiNumber }),
-      ...(input.poId && { poId: input.poId }),
-      ...(input.category && { category: input.category }),
-      ...(input.senderPhone && { senderPhone: input.senderPhone }),
-      ...(input.receiverPhone && { receiverPhone: input.receiverPhone }),
-      ...(input.status && { status: input.status }),
-      ...(input.receiptUrl && { receiptUrl: input.receiptUrl }),
-      ...(input.receiptFileName && { receiptFileName: input.receiptFileName }),
-      updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+    const updateData: Record<string, any> = {
+      updatedAt: Timestamp.now(),
     };
 
-    mockResis[resiIndex] = updatedResi;
+    if (input.resiNumber !== undefined) updateData.resiNumber = input.resiNumber;
+    if (input.poId !== undefined) updateData.poId = input.poId;
+    if (input.category !== undefined) updateData.category = input.category;
+    if (input.senderPhone !== undefined) updateData.senderPhone = input.senderPhone;
+    if (input.receiverPhone !== undefined) updateData.receiverPhone = input.receiverPhone;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.receiptUrl !== undefined) updateData.receiptUrl = input.receiptUrl;
+    if (input.receiptFileName !== undefined) updateData.receiptFileName = input.receiptFileName;
+
+    await docRef.update(updateData);
+
+    revalidatePath('/resi');
+    revalidatePath(`/resi/${id}`);
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: updatedResi,
+      data: serializeResi(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -367,9 +348,10 @@ export async function deleteResi(id: string): Promise<Result<void>> {
       };
     }
 
-    const resiIndex = mockResis.findIndex((r) => r.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (resiIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -379,20 +361,9 @@ export async function deleteResi(id: string): Promise<Result<void>> {
       };
     }
 
-    const resi = mockResis[resiIndex];
+    await docRef.delete();
 
-    // Check category access
-    if (!canAccessCategory(user.role, resi.category)) {
-      return {
-        success: false,
-        error: {
-          code: 'AUTHZ_CATEGORY_RESTRICTED',
-          message: 'You do not have access to this category',
-        },
-      };
-    }
-
-    mockResis.splice(resiIndex, 1);
+    revalidatePath('/resi');
 
     return {
       success: true,

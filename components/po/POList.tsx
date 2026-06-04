@@ -36,9 +36,10 @@ export function POList({ pos, canManage }: POListProps) {
   const handleExportExcel = () => {
     const exportData = pos.map((po) => ({
       poNumber: po.poNumber,
+      poDate: po.poDate || '—',
       category: po.category,
       fileName: po.fileName,
-      supplier: po.metadata?.supplier || '—',
+      herminaLocation: po.herminaLocation || '—',
       createdAt: new Date(po.createdAt.seconds * 1000).toLocaleDateString(),
     }));
 
@@ -46,9 +47,10 @@ export function POList({ pos, canManage }: POListProps) {
       exportData,
       [
         { header: 'PO Number', key: 'poNumber', width: 20 },
+        { header: 'PO Date', key: 'poDate', width: 15 },
         { header: 'Category', key: 'category', width: 15 },
         { header: 'File Name', key: 'fileName', width: 30 },
-        { header: 'Supplier', key: 'supplier', width: 20 },
+        { header: 'RS Hermina', key: 'herminaLocation', width: 25 },
         { header: 'Created Date', key: 'createdAt', width: 15 },
       ],
       `Purchase_Orders_${new Date().toISOString().split('T')[0]}`
@@ -62,25 +64,21 @@ export function POList({ pos, canManage }: POListProps) {
       sortable: true,
     },
     {
-      key: 'category',
-      label: 'Category',
+      key: 'poDate',
+      label: 'PO Date',
       sortable: true,
-      render: (po) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-          {po.category}
-        </span>
-      ),
+      render: (po) => po.poDate || '—',
+    },
+    {
+      key: 'herminaLocation',
+      label: 'RS Hermina',
+      sortable: true,
+      render: (po) => po.herminaLocation || '—',
     },
     {
       key: 'fileName',
       label: 'File',
       sortable: false,
-    },
-    {
-      key: 'metadata',
-      label: 'Supplier',
-      sortable: false,
-      render: (po) => po.metadata?.supplier || '—',
     },
     {
       key: 'createdAt',
@@ -97,17 +95,18 @@ export function POList({ pos, canManage }: POListProps) {
       sortable: false,
       render: (po) => (
         <div className="flex items-center gap-2">
-          <Link
-            href={`/po/${po.id}`}
+          <a
+            href={po.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-            title="View details"
+            title="View PO File"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            View
-          </Link>
+
+          </a>
           {canManage && (
             <>
               <Link
@@ -118,7 +117,7 @@ export function POList({ pos, canManage }: POListProps) {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                Edit
+
               </Link>
               <button
                 onClick={() => handleDelete(po.id, po.poNumber)}
@@ -129,7 +128,7 @@ export function POList({ pos, canManage }: POListProps) {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                {isDeleting === po.id ? 'Deleting...' : 'Delete'}
+
               </button>
             </>
           )}

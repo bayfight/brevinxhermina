@@ -3,44 +3,39 @@
 import { Invoice, Result, Category } from '@/types/models';
 import { getCurrentUser } from '@/lib/auth-server';
 import { hasFullInvoiceAccess, hasReadInvoiceAccess } from '@/lib/authorization';
+import { db } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import { revalidatePath } from 'next/cache';
 
-// Mock data store (in-memory for MVP)
-let mockInvoices: Invoice[] = [
-  {
-    id: '1',
-    invoiceNumber: 'INV-2024-001',
-    resiId: '1',
-    poId: '1',
-    category: 'kopi',
-    invoiceTemplateUrl: '#',
-    deliveryNoteUrl: '#',
-    poAttachmentUrl: '#',
-    receiptUrl: '#',
-    resiNumber: 'RESI-2024-001',
-    totalAmount: 5000000,
-    createdBy: 'user1',
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-  {
-    id: '2',
-    invoiceNumber: 'INV-2024-002',
-    resiId: '2',
-    poId: '2',
-    category: 'syrup',
-    invoiceTemplateUrl: '#',
-    deliveryNoteUrl: '#',
-    poAttachmentUrl: '#',
-    receiptUrl: '#',
-    resiNumber: 'RESI-2024-002',
-    totalAmount: 3000000,
-    createdBy: 'user1',
-    createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-    updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-  },
-];
+const COLLECTION_NAME = 'invoices';
 
-let nextId = 3;
+function serializeTimestamp(timestamp: any) {
+  if (!timestamp) return null;
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  } as any;
+}
+
+function serializeInvoice(id: string, data: FirebaseFirestore.DocumentData): Invoice {
+  return {
+    id,
+    invoiceNumber: data.invoiceNumber,
+    resiId: data.resiId,
+    poId: data.poId,
+    category: data.category,
+    invoiceTemplateUrl: data.invoiceTemplateUrl,
+    deliveryNoteUrl: data.deliveryNoteUrl,
+    poAttachmentUrl: data.poAttachmentUrl,
+    receiptUrl: data.receiptUrl,
+    resiNumber: data.resiNumber,
+    totalAmount: data.totalAmount,
+    billingLetterUrl: data.billingLetterUrl,
+    createdBy: data.createdBy,
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+}
 
 export async function listInvoices(): Promise<Result<Invoice[]>> {
   try {
@@ -67,9 +62,16 @@ export async function listInvoices(): Promise<Result<Invoice[]>> {
       };
     }
 
+    const snapshot = await db
+      .collection(COLLECTION_NAME)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const invoices = snapshot.docs.map((doc) => serializeInvoice(doc.id, doc.data()));
+
     return {
       success: true,
-      data: mockInvoices,
+      data: invoices,
     };
   } catch (error) {
     return {
@@ -107,9 +109,9 @@ export async function getInvoiceById(id: string): Promise<Result<Invoice>> {
       };
     }
 
-    const invoice = mockInvoices.find((inv) => inv.id === id);
+    const doc = await db.collection(COLLECTION_NAME).doc(id).get();
     
-    if (!invoice) {
+    if (!doc.exists) {
       return {
         success: false,
         error: {
@@ -121,7 +123,7 @@ export async function getInvoiceById(id: string): Promise<Result<Invoice>> {
 
     return {
       success: true,
-      data: invoice,
+      data: serializeInvoice(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -137,9 +139,10 @@ export async function getInvoiceById(id: string): Promise<Result<Invoice>> {
 interface CreateInvoiceInput {
   invoiceNumber: string;
   resiId: string;
-  category: Category;
+  poId?: string;
+  category?: Category;
   totalAmount?: number;
-  invoiceTemplateUrl: string;
+  invoiceTemplateUrl?: string;
   deliveryNoteUrl: string;
   receiptUrl: string;
 }
@@ -170,19 +173,24 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Result<I
     }
 
     // Validate required fields
-    if (!input.invoiceNumber || !input.resiId || !input.category || !input.invoiceTemplateUrl || !input.deliveryNoteUrl || !input.receiptUrl) {
+    if (!input.invoiceNumber || !input.resiId || !input.deliveryNoteUrl || !input.receiptUrl) {
       return {
         success: false,
         error: {
           code: 'VALIDATION_REQUIRED_FIELD',
-          message: 'All fields including file uploads are required',
+          message: 'All fields including file uploads (Delivery Note and Receipt) are required',
         },
       };
     }
 
     // Check for duplicate invoice number
-    const existingInvoice = mockInvoices.find((inv) => inv.invoiceNumber === input.invoiceNumber);
-    if (existingInvoice) {
+    const duplicateCheck = await db
+      .collection(COLLECTION_NAME)
+      .where('invoiceNumber', '==', input.invoiceNumber)
+      .limit(1)
+      .get();
+
+    if (!duplicateCheck.empty) {
       return {
         success: false,
         error: {
@@ -192,32 +200,62 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Result<I
       };
     }
 
-    const now = { seconds: Date.now() / 1000, nanoseconds: 0 } as any;
+    // Fetch Resi data directly from Firestore
+    const resiDoc = await db.collection('resis').doc(input.resiId).get();
+    if (!resiDoc.exists) {
+      return {
+        success: false,
+        error: {
+          code: 'RESI_NOT_FOUND',
+          message: 'Related Resi not found',
+        },
+      };
+    }
+    const resiData = resiDoc.data()!;
+
+    // Fetch PO data directly from Firestore
+    const poDoc = await db.collection('purchase_orders').doc(resiData.poId).get();
+    const poData = poDoc.exists ? poDoc.data() : null;
+
+    const now = Timestamp.now();
     
-    // In a real implementation, we would fetch the Resi and PO data here
-    // For MVP, we'll use mock data
-    const newInvoice: Invoice = {
-      id: String(nextId++),
+    const invoicePayload = {
       invoiceNumber: input.invoiceNumber,
       resiId: input.resiId,
-      poId: '1', // Mock - would be fetched from Resi
-      category: input.category,
-      invoiceTemplateUrl: input.invoiceTemplateUrl,
+      poId: input.poId || resiData.poId || '',
+      category: input.category || resiData.category || 'kopi',
+      invoiceTemplateUrl: input.invoiceTemplateUrl || '',
       deliveryNoteUrl: input.deliveryNoteUrl,
-      poAttachmentUrl: '#', // Mock - would be copied from PO
+      poAttachmentUrl: poData ? poData.fileUrl : '#',
       receiptUrl: input.receiptUrl,
-      resiNumber: 'RESI-MOCK', // Mock - would be fetched from Resi
-      totalAmount: input.totalAmount,
+      resiNumber: resiData.resiNumber,
+      totalAmount: input.totalAmount || 0,
       createdBy: user.uid,
       createdAt: now,
       updatedAt: now,
     };
 
-    mockInvoices.push(newInvoice);
+    const docRef = await db.collection(COLLECTION_NAME).add(invoicePayload);
+
+    // Automatically create a Finance Record linked to this new Invoice
+    // Collection: finance_records
+    await db.collection('finance_records').add({
+      invoiceId: docRef.id,
+      category: invoicePayload.category,
+      paymentStatus: 'unpaid',
+      amount: invoicePayload.totalAmount,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    revalidatePath('/invoice');
+    revalidatePath('/finance');
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: newInvoice,
+      data: serializeInvoice(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -233,6 +271,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Result<I
 interface UpdateInvoiceInput {
   invoiceNumber?: string;
   resiId?: string;
+  poId?: string;
   category?: Category;
   totalAmount?: number;
   invoiceTemplateUrl?: string;
@@ -268,9 +307,10 @@ export async function updateInvoice(
       };
     }
 
-    const invoiceIndex = mockInvoices.findIndex((inv) => inv.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (invoiceIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -281,9 +321,14 @@ export async function updateInvoice(
     }
 
     // Check for duplicate invoice number if updating
-    if (input.invoiceNumber && input.invoiceNumber !== mockInvoices[invoiceIndex].invoiceNumber) {
-      const existingInvoice = mockInvoices.find((inv) => inv.invoiceNumber === input.invoiceNumber);
-      if (existingInvoice) {
+    if (input.invoiceNumber && input.invoiceNumber !== existing.data()!.invoiceNumber) {
+      const duplicateCheck = await db
+        .collection(COLLECTION_NAME)
+        .where('invoiceNumber', '==', input.invoiceNumber)
+        .limit(1)
+        .get();
+
+      if (!duplicateCheck.empty) {
         return {
           success: false,
           error: {
@@ -294,23 +339,46 @@ export async function updateInvoice(
       }
     }
 
-    const updatedInvoice: Invoice = {
-      ...mockInvoices[invoiceIndex],
-      ...(input.invoiceNumber && { invoiceNumber: input.invoiceNumber }),
-      ...(input.resiId && { resiId: input.resiId }),
-      ...(input.category && { category: input.category }),
-      ...(input.totalAmount !== undefined && { totalAmount: input.totalAmount }),
-      ...(input.invoiceTemplateUrl && { invoiceTemplateUrl: input.invoiceTemplateUrl }),
-      ...(input.deliveryNoteUrl && { deliveryNoteUrl: input.deliveryNoteUrl }),
-      ...(input.receiptUrl && { receiptUrl: input.receiptUrl }),
-      updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+    const updateData: Record<string, any> = {
+      updatedAt: Timestamp.now(),
     };
 
-    mockInvoices[invoiceIndex] = updatedInvoice;
+    if (input.invoiceNumber !== undefined) updateData.invoiceNumber = input.invoiceNumber;
+    if (input.resiId !== undefined) updateData.resiId = input.resiId;
+    if (input.poId !== undefined) updateData.poId = input.poId;
+    if (input.category !== undefined) updateData.category = input.category;
+    if (input.totalAmount !== undefined) updateData.totalAmount = input.totalAmount;
+    if (input.invoiceTemplateUrl !== undefined) updateData.invoiceTemplateUrl = input.invoiceTemplateUrl;
+    if (input.deliveryNoteUrl !== undefined) updateData.deliveryNoteUrl = input.deliveryNoteUrl;
+    if (input.receiptUrl !== undefined) updateData.receiptUrl = input.receiptUrl;
+
+    await docRef.update(updateData);
+
+    // Also update amount in Finance Record if totalAmount changes
+    if (input.totalAmount !== undefined) {
+      const financeSnapshot = await db
+        .collection('finance_records')
+        .where('invoiceId', '==', id)
+        .limit(1)
+        .get();
+
+      if (!financeSnapshot.empty) {
+        await financeSnapshot.docs[0].ref.update({
+          amount: input.totalAmount,
+          updatedAt: Timestamp.now(),
+        });
+      }
+    }
+
+    revalidatePath('/invoice');
+    revalidatePath(`/invoice/${id}`);
+    revalidatePath('/finance');
+
+    const doc = await docRef.get();
 
     return {
       success: true,
-      data: updatedInvoice,
+      data: serializeInvoice(doc.id, doc.data()!),
     };
   } catch (error) {
     return {
@@ -348,9 +416,10 @@ export async function deleteInvoice(id: string): Promise<Result<void>> {
       };
     }
 
-    const invoiceIndex = mockInvoices.findIndex((inv) => inv.id === id);
+    const docRef = db.collection(COLLECTION_NAME).doc(id);
+    const existing = await docRef.get();
     
-    if (invoiceIndex === -1) {
+    if (!existing.exists) {
       return {
         success: false,
         error: {
@@ -360,7 +429,20 @@ export async function deleteInvoice(id: string): Promise<Result<void>> {
       };
     }
 
-    mockInvoices.splice(invoiceIndex, 1);
+    await docRef.delete();
+
+    // Also delete linked Finance Record
+    const financeSnapshot = await db
+      .collection('finance_records')
+      .where('invoiceId', '==', id)
+      .get();
+
+    for (const doc of financeSnapshot.docs) {
+      await doc.ref.delete();
+    }
+
+    revalidatePath('/invoice');
+    revalidatePath('/finance');
 
     return {
       success: true,
@@ -376,3 +458,70 @@ export async function deleteInvoice(id: string): Promise<Result<void>> {
     };
   }
 }
+
+export async function updateInvoiceBillingLetter(
+  invoiceId: string,
+  billingLetterUrl: string
+): Promise<Result<Invoice>> {
+  try {
+    const user = await getCurrentUser();
+    
+    if (!user) {
+      return {
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'Authentication required',
+        },
+      };
+    }
+
+    if (!hasFullInvoiceAccess(user.role)) {
+      return {
+        success: false,
+        error: {
+          code: 'AUTHZ_FORBIDDEN',
+          message: 'Only Super Admin can manage billing letters',
+        },
+      };
+    }
+
+    const docRef = db.collection(COLLECTION_NAME).doc(invoiceId);
+    const existing = await docRef.get();
+    
+    if (!existing.exists) {
+      return {
+        success: false,
+        error: {
+          code: 'DB_NOT_FOUND',
+          message: 'Invoice not found',
+        },
+      };
+    }
+
+    await docRef.update({
+      billingLetterUrl,
+      updatedAt: Timestamp.now(),
+    });
+
+    revalidatePath('/dashboard');
+    revalidatePath('/invoice');
+    revalidatePath(`/invoice/${invoiceId}`);
+
+    const doc = await docRef.get();
+
+    return {
+      success: true,
+      data: serializeInvoice(doc.id, doc.data()!),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        code: 'DB_OPERATION_FAILED',
+        message: 'Failed to update billing letter',
+      },
+    };
+  }
+}
+

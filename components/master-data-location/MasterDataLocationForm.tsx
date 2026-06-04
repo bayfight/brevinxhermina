@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ItemStatus, LocationType, MasterDataLocation } from '@/types/models';
+import { ItemStatus, MasterDataLocation } from '@/types/models';
 import {
   createMasterDataLocation,
   updateMasterDataLocation,
@@ -18,10 +18,10 @@ export function MasterDataLocationForm({ mode, initialData }: MasterDataLocation
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    locationCode: initialData?.locationCode || '',
-    province: initialData?.province || '',
-    type: initialData?.type || ('kabupaten' as LocationType),
-    name: initialData?.name || '',
+    branchName: initialData?.branchName || '',
+    address: initialData?.address || '',
+    picName: initialData?.picName || '',
+    picPhone: initialData?.picPhone || '',
     status: initialData?.status || ('active' as ItemStatus),
   });
 
@@ -61,67 +61,50 @@ export function MasterDataLocationForm({ mode, initialData }: MasterDataLocation
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label htmlFor="locationCode" className="block text-sm font-medium text-gray-700 mb-2">
-            Location Code <span className="text-red-500">*</span>
+          <label htmlFor="branchName" className="block text-sm font-medium text-gray-700 mb-2">
+            Cabang Hermina <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
-            id="locationCode"
-            value={formData.locationCode}
-            onChange={(e) => setFormData({ ...formData, locationCode: e.target.value })}
+            id="branchName"
+            value={formData.branchName}
+            onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
             disabled={isReadOnly}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="e.g., 3273"
+            placeholder="e.g., RS Hermina Pasteur"
           />
         </div>
 
         <div>
-          <label htmlFor="province" className="block text-sm font-medium text-gray-700 mb-2">
-            Province <span className="text-red-500">*</span>
+          <label htmlFor="picName" className="block text-sm font-medium text-gray-700 mb-2">
+            Nama PIC <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
-            id="province"
-            value={formData.province}
-            onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+            id="picName"
+            value={formData.picName}
+            onChange={(e) => setFormData({ ...formData, picName: e.target.value })}
             disabled={isReadOnly}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="e.g., Jawa Barat"
+            placeholder="e.g., TIA LESTARI"
           />
         </div>
 
         <div>
-          <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
-            Type <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="type"
-            value={formData.type}
-            onChange={(e) => setFormData({ ...formData, type: e.target.value as LocationType })}
-            disabled={isReadOnly}
-            required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            <option value="kabupaten">Kabupaten</option>
-            <option value="kota">Kota</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-            Kabupaten/Kota Name <span className="text-red-500">*</span>
+          <label htmlFor="picPhone" className="block text-sm font-medium text-gray-700 mb-2">
+            No. HP <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            id="picPhone"
+            value={formData.picPhone}
+            onChange={(e) => setFormData({ ...formData, picPhone: e.target.value })}
             disabled={isReadOnly}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="e.g., Bandung"
+            placeholder="e.g., 0858-1970-9833"
           />
         </div>
 
@@ -140,6 +123,22 @@ export function MasterDataLocationForm({ mode, initialData }: MasterDataLocation
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+            Alamat <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            id="address"
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            disabled={isReadOnly}
+            required
+            rows={3}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            placeholder="e.g., Jl. A.H. Nasution KM 7 No. 50..."
+          />
         </div>
       </div>
 

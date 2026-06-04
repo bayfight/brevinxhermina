@@ -122,15 +122,15 @@ export function DataTable<T extends Record<string, any>>({
     }
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-gray-200">
+        <div className="text-center sm:text-left">
           <span className="text-sm text-gray-700">
             Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
             {Math.min(currentPage * itemsPerPage, sortedData.length)} of{' '}
             {sortedData.length} results
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center flex-wrap gap-2">
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
@@ -198,9 +198,9 @@ export function DataTable<T extends Record<string, any>>({
           />
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto lg:max-h-[480px] lg:overflow-y-auto relative">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               {columns.map((column) => (
                 <th
@@ -235,11 +235,21 @@ export function DataTable<T extends Record<string, any>>({
             ) : (
               paginatedData.map((item, index) => (
                 <tr key={index} className="hover:bg-gray-50">
-                  {columns.map((column) => (
-                    <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {column.render ? column.render(item) : item[column.key]}
-                    </td>
-                  ))}
+                  {columns.map((column) => {
+                    const rawValue = item[column.key];
+                    const displayValue = rawValue != null ? String(rawValue) : '';
+                    return (
+                      <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {column.render ? (
+                          column.render(item)
+                        ) : (
+                          <div className="lg:max-w-[200px] lg:truncate" title={displayValue}>
+                            {rawValue}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

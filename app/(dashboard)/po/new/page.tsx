@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth-server';
 import { hasFullPOAccess } from '@/lib/authorization';
+import { listMasterDataLocations } from '@/app/actions/master-data-location';
 import { POForm } from '@/components/po/POForm';
 
 export default async function NewPOPage() {
@@ -14,6 +15,9 @@ export default async function NewPOPage() {
     redirect('/po');
   }
 
+  const locationsResult = await listMasterDataLocations();
+  const availableLocations = locationsResult.success ? locationsResult.data : [];
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -21,7 +25,7 @@ export default async function NewPOPage() {
         <p className="text-gray-600 mt-2">Add a new purchase order to the system</p>
       </div>
 
-      <POForm mode="create" />
+      <POForm mode="create" availableLocations={availableLocations} />
     </div>
   );
 }

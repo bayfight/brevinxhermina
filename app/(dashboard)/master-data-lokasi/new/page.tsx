@@ -18,7 +18,7 @@ export default async function NewMasterDataLokasiPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Create Master Data Lokasi</h1>
-        <p className="text-gray-600 mt-2">Add a new Indonesian kabupaten or kota</p>
+        <p className="text-gray-600 mt-2">Add a new Hermina branch location with PIC details</p>
       </div>
 
       <MasterDataLocationForm mode="create" />

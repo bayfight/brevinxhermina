@@ -37,6 +37,7 @@ export interface User {
 export interface PurchaseOrder {
   id: string;
   poNumber: string;
+  poDate?: string; // Added poDate
   fileUrl: string;
   fileName: string;
   fileSize: number;
@@ -45,6 +46,8 @@ export interface PurchaseOrder {
   uploadedAt: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  herminaLocation?: string; // Added herminaLocation
+  totalAmount?: number; // Added totalAmount
   metadata?: Record<string, any>;
 }
 
@@ -53,12 +56,12 @@ export interface Resi {
   id: string;
   resiNumber: string;
   poId: string;
-  category: Category;
+  category?: Category; // Deprecated
   senderPhone: string;
   receiverPhone: string;
   receiptUrl: string;
   receiptFileName: string;
-  status: ResiStatus;
+  status?: ResiStatus; // Deprecated
   uploadedBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -70,13 +73,14 @@ export interface Invoice {
   invoiceNumber: string;
   resiId: string;
   poId: string;
-  category: Category;
-  invoiceTemplateUrl: string;
+  category?: Category; // Deprecated
+  invoiceTemplateUrl?: string; // Deprecated
   deliveryNoteUrl: string;
   poAttachmentUrl: string;
   receiptUrl: string;
   resiNumber: string;
   totalAmount?: number;
+  billingLetterUrl?: string; // Tautan Surat Penagihan
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -112,10 +116,10 @@ export interface MasterDataItem {
 // Master Data Location Model
 export interface MasterDataLocation {
   id: string;
-  locationCode: string;
-  province: string;
-  type: LocationType;
-  name: string;
+  branchName: string;      // Cabang Hermina
+  address: string;         // Alamat
+  picName: string;         // Nama PIC
+  picPhone: string;        // No. HP
   status: ItemStatus;
   createdBy: string;
   createdAt: Timestamp;
