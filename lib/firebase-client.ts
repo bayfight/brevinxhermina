@@ -12,14 +12,20 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check if we are in build time and lack the API Key.
+// Helper to check if the Firebase API Key is valid
+const isValidApiKey = (key?: string): boolean => {
+  if (!key) return false;
+  const cleanKey = key.trim();
+  return cleanKey.length > 10 && cleanKey !== "undefined" && cleanKey !== "null" && cleanKey !== "";
+};
+
+// Check if we are in build time or lack a valid API Key.
 // Using a dummy config during build-time prevents the Firebase SDK from throwing "auth/invalid-api-key"
 // when compiling static pages like the login page on hosting platforms like Vercel.
-const isBuildTime = 
-  typeof window === 'undefined' && 
-  (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PHASE === 'phase-production-build');
+const isBuildTime = typeof window === 'undefined';
+const useDummyConfig = isBuildTime || !isValidApiKey(firebaseConfig.apiKey);
 
-const config = isBuildTime && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+const config = useDummyConfig
   ? {
       apiKey: "dummy-api-key-for-build-time-only",
       authDomain: "dummy-project.firebaseapp.com",
